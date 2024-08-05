@@ -10,5 +10,6 @@
 	"feature_maker_script": "./feature_maker.sh",
 	"amino_acid_feature_script": "./add_amino_acid_features.sh",
 	"graph_maker_script": "./edge_maker.py",
-	"edge_dists_path": "./dists/"
+	"edge_dists_path": "./dists/",
+    "mafft_id": "mafft_id_0"
 }
