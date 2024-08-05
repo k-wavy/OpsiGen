@@ -5,7 +5,7 @@ Generate graph edges between nodes x,y such that the edge will be 1/d(x,y).
 """
 import os
 
-import aligner
+import aligner_plus as aligner
 import cutter
 from config import parse_args
 
