@@ -40,6 +40,26 @@ Edit `configs/train.example.json` so the graph feature and distance directories 
 python -m opsigen train --config configs/train.example.json
 ```
 
+For the WDS sequence/lambda-max files, prepare the metadata and configs first:
+
+```bash
+python -m opsigen prepare-wds \
+  --meta /path/to/wds_meta.tsv \
+  --fasta /path/to/wds.fasta \
+  --pdb-dir /path/to/pdb_folder \
+  --output-dir datasets/wds \
+  --configs-dir configs
+```
+
+If the PDB directory is not available yet, omit `--pdb-dir`; this still creates the training table, FASTA records, split files, and config templates. Re-run the same command with `--pdb-dir` before preprocessing.
+
+Then run:
+
+```bash
+python -m opsigen preprocess --config configs/preprocess.wds.json
+python -m opsigen train --config configs/train.wds.json
+```
+
 The training entry point performs configuration loading, input validation, dataset normalization, weighted sampling, model construction, training/evaluation, checkpointing, metrics logging, and metadata writing.
 
 Training outputs are written under `outputs.output_dir`, for example:

@@ -1,0 +1,12 @@
+{
+  "input_manifest": "../datasets/wds/preprocess_manifest.csv",
+  "preprocessing": {
+    "reference_alignment": "../excel/sequences.fas",
+    "output_dir": "../runs/preprocess/wds",
+    "mafft_executable": "mafft",
+    "feature_maker_binary": "../feature_maker/interface2grid",
+    "chem_lib_path": "../feature_maker/chem.lib",
+    "amino_mapping_path": "../feature_maker/add_amino_acid_features/amino_mapping",
+    "original_feature_length": 18
+  }
+}

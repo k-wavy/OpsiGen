@@ -1,0 +1,64 @@
+{
+  "model": {
+    "model_path": "../runs/train/wds/checkpoints/opsigen_wds_model.pkl"
+  },
+  "normalization": {
+    "means_path": "../runs/train/wds/artifacts/means.npy",
+    "stds_path": "../runs/train/wds/artifacts/stds.npy"
+  },
+  "data": {
+    "indexes_to_keep": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35
+    ],
+    "graph_threshold": 2,
+    "device": "auto"
+  },
+  "preprocessing": {
+    "reference_alignment": "../excel/sequences.fas",
+    "output_dir": "../runs/predict/wds/preprocessed",
+    "mafft_executable": "mafft",
+    "feature_maker_binary": "../feature_maker/interface2grid",
+    "chem_lib_path": "../feature_maker/chem.lib",
+    "amino_mapping_path": "../feature_maker/add_amino_acid_features/amino_mapping",
+    "original_feature_length": 18
+  },
+  "input_manifest": "../datasets/wds/predict_manifest.template.csv",
+  "outputs": {
+    "output_dir": "../runs/predict/wds"
+  }
+}

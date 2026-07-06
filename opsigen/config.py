@@ -107,6 +107,11 @@ class GraphDataConfig:
     indexes_to_keep: tuple[int, ...] = tuple(range(36))
     dataset_normalize_last: bool = True
     drop_last_row: bool = True
+    id_column: str = "Name"
+    target_column: str = "lmax"
+    wildtype_column: str = "Wildtype"
+    features_column: str | None = None
+    dists_column: str | None = None
 
     @classmethod
     def from_mapping(cls, mapping: Mapping[str, Any], base_dir: Path) -> "GraphDataConfig":
@@ -127,6 +132,11 @@ class GraphDataConfig:
             indexes_to_keep=tuple(int(i) for i in source.get("indexes_to_keep", range(36))),
             dataset_normalize_last=bool(source.get("dataset_normalize_last", True)),
             drop_last_row=bool(source.get("drop_last_row", True)),
+            id_column=str(source.get("id_column", "Name")),
+            target_column=str(source.get("target_column", "lmax")),
+            wildtype_column=str(source.get("wildtype_column", "Wildtype")),
+            features_column=source.get("features_column"),
+            dists_column=source.get("dists_column"),
         )
 
 

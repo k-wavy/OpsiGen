@@ -36,6 +36,8 @@ def validate_graph_paths(config: GraphDataConfig) -> None:
         "graph_features_path": config.graph_features_path,
         "graph_dists_path": config.graph_dists_path,
     }.items():
+        if (config.features_column or config.dists_column) and not path.exists():
+            continue
         if not path.exists() or not path.is_dir():
             raise InputValidationError(f"Missing {key} directory: {path}")
 
@@ -119,15 +121,30 @@ class GraphDataset:
         return list(self.excel_data[category])
 
     def graph_paths_for_index(self, idx: int) -> tuple[Path, Path]:
+        entry = self.excel_data.iloc[idx]
+        if self.config.features_column and self.config.dists_column:
+            for column in (self.config.features_column, self.config.dists_column):
+                if column not in self.excel_data.columns:
+                    raise InputValidationError(f"Excel dataset is missing graph path column: {column}")
+            return (
+                self._resolve_table_path(entry[self.config.dists_column]),
+                self._resolve_table_path(entry[self.config.features_column]),
+            )
         return (
             self.config.graph_dists_path / f"cutted_parts{idx}_dists.npy",
             self.config.graph_features_path / f"cutted_parts{idx}.npz",
         )
 
+    def _resolve_table_path(self, value: object) -> Path:
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            raise InputValidationError("Encountered an empty graph path in the training table.")
+        path = Path(str(value)).expanduser()
+        return path if path.is_absolute() else (self.config.excel_path.parent / path).resolve()
+
     def calculate_weights(self) -> np.ndarray:
         from collections import Counter
 
-        wildtypes = self.get_category("Wildtype")[: len(self)]
+        wildtypes = self.get_category(self.config.wildtype_column)[: len(self)]
         wildtype_counts = Counter(wildtypes)
         return np.asarray([1 / wildtype_counts[wildtype] for wildtype in wildtypes], dtype=float)
 
@@ -138,7 +155,7 @@ class GraphDataset:
             graph = read_graph(*graph_paths, indexes=self.config.indexes_to_keep)
             if graph is None:
                 continue
-            wildtype = self.get_category("Wildtype")[idx]
+            wildtype = self.get_category(self.config.wildtype_column)[idx]
             if wildtype not in self.wildtypes_names:
                 continue
             values.append(graph.features)
@@ -173,8 +190,8 @@ class GraphDataset:
         if graph is None:
             return [], [], 0
 
-        wildtype = self.get_category("Wildtype")[idx]
-        target = self.get_category("lmax")[idx]
+        wildtype = self.get_category(self.config.wildtype_column)[idx]
+        target = self.get_category(self.config.target_column)[idx]
         if wildtype not in self.wildtypes_names:
             return [], [], 0
 
