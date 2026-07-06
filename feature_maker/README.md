@@ -5,7 +5,7 @@
 The Python pipeline calls it as:
 
 ```bash
-feature_maker/interface2grid -i <cut_pdb_dir> -o <atom_features_dir>
+feature_maker/interface2grid -i <cut_pdb_dir> -o <atom_features_dir>/ -l feature_maker/chem.lib
 ```
 
 If you need to rebuild it, configure local dependency roots with CMake cache variables instead of editing `CMakeLists.txt`:

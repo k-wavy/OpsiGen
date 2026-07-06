@@ -277,6 +277,7 @@ class PreprocessConfig:
     output_dir: Path
     mafft_executable: str = "mafft"
     feature_maker_binary: Path = Path("feature_maker/interface2grid")
+    chem_lib_path: Path | None = None
     amino_mapping_path: Path = Path("feature_maker/add_amino_acid_features/amino_mapping")
     aligned_positions: tuple[int, ...] = DEFAULT_ALIGNED_POSITIONS
     original_feature_length: int = 18
@@ -287,20 +288,28 @@ class PreprocessConfig:
         source = preprocessing or mapping
         reference_value = _get_nested(source, ("reference_alignment", "sequences"))
         output_value = _get_nested(source, ("output_dir", "preprocessed_dir"), "runs/preprocess")
+        feature_maker_binary = require_path(
+            source.get(
+                "feature_maker_binary",
+                "../feature_maker/interface2grid"
+                if "sequences" in source
+                else "feature_maker/interface2grid",
+            ),
+            base_dir,
+            "preprocessing.feature_maker_binary",
+        )
+        chem_lib_value = source.get("chem_lib_path")
+        chem_lib_path = (
+            require_path(chem_lib_value, base_dir, "preprocessing.chem_lib_path")
+            if chem_lib_value
+            else feature_maker_binary.parent / "chem.lib"
+        )
         return cls(
             reference_alignment=require_path(reference_value, base_dir, "preprocessing.reference_alignment"),
             output_dir=require_path(output_value, base_dir, "preprocessing.output_dir"),
             mafft_executable=str(source.get("mafft_executable", "mafft")),
-            feature_maker_binary=require_path(
-                source.get(
-                    "feature_maker_binary",
-                    "../feature_maker/interface2grid"
-                    if "sequences" in source
-                    else "feature_maker/interface2grid",
-                ),
-                base_dir,
-                "preprocessing.feature_maker_binary",
-            ),
+            feature_maker_binary=feature_maker_binary,
+            chem_lib_path=chem_lib_path,
             amino_mapping_path=require_path(
                 source.get(
                     "amino_mapping_path",

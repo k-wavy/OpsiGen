@@ -208,7 +208,12 @@ def cut_pdb_to_residues(input_pdb: Path, output_pdb: Path, residue_numbers: Iter
     io.save(str(output_pdb))
 
 
-def run_native_feature_maker(cut_pdb_dir: Path, atom_features_dir: Path, binary: Path) -> None:
+def run_native_feature_maker(
+    cut_pdb_dir: Path,
+    atom_features_dir: Path,
+    binary: Path,
+    chem_lib_path: Path | None = None,
+) -> None:
     """Run the native ``interface2grid`` feature generator."""
 
     if not binary.exists():
@@ -216,10 +221,32 @@ def run_native_feature_maker(cut_pdb_dir: Path, atom_features_dir: Path, binary:
             f"Native feature generator does not exist: {binary}. "
             "Build feature_maker/interface2grid or set preprocessing.feature_maker_binary."
         )
+    if chem_lib_path is None:
+        chem_lib_path = binary.parent / "chem.lib"
+    if not chem_lib_path.exists():
+        raise ExternalToolError(
+            f"Native feature generator chemistry library does not exist: {chem_lib_path}. "
+            "Set preprocessing.chem_lib_path to the correct chem.lib file."
+        )
     atom_features_dir.mkdir(parents=True, exist_ok=True)
-    command = [str(binary), "-i", str(cut_pdb_dir), "-o", str(atom_features_dir)]
+    output_dir_arg = str(atom_features_dir.resolve()) + "/"
+    command = [
+        str(binary.resolve()),
+        "-i",
+        str(cut_pdb_dir.resolve()),
+        "-o",
+        output_dir_arg,
+        "-l",
+        str(chem_lib_path.resolve()),
+    ]
     LOGGER.info("Running native feature maker for %s", cut_pdb_dir)
-    completed = subprocess.run(command, stderr=subprocess.PIPE, text=True, check=False)
+    completed = subprocess.run(
+        command,
+        cwd=str(binary.resolve().parent),
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
     if completed.returncode != 0:
         raise ExternalToolError(
             f"Feature maker failed with exit code {completed.returncode}:\n"
@@ -368,7 +395,12 @@ def preprocess_opsins(
         LOGGER.info("Cutting %s to %s selected residue positions.", item.pdb_path, len(residue_numbers))
         cut_pdb_to_residues(item.pdb_path, item.cut_pdb_path, residue_numbers)
 
-    run_native_feature_maker(cut_dir, config.output_dir / "atom_features", config.feature_maker_binary)
+    run_native_feature_maker(
+        cut_dir,
+        config.output_dir / "atom_features",
+        config.feature_maker_binary,
+        config.chem_lib_path,
+    )
     append_amino_acid_features(
         cut_pdb_dir=cut_dir,
         atom_features_dir=config.output_dir / "atom_features",

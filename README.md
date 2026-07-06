@@ -30,6 +30,7 @@ pip install -e .
 ```
 
 Prediction from FASTA/PDB inputs also requires `mafft` and the native `feature_maker/interface2grid` binary. If you rebuild the native helper, configure its dependency roots with CMake variables such as `-DGAMB_ROOT=/path/to/gamb` and `-DDOCKINGLIB_ROOT=/path/to/DockingLib`.
+The native helper also needs `feature_maker/chem.lib`; set `preprocessing.chem_lib_path` if it is not next to `interface2grid`.
 
 ## Train A New Model
 
