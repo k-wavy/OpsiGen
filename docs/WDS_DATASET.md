@@ -34,3 +34,34 @@ python -m opsigen predict --config configs/predict.wds.example.json
 ```
 
 If `preprocess_manifest.csv` has empty `pdb_path` values, rerun `prepare-wds` with `--pdb-dir` before preprocessing.
+
+## Bovine Reference Numbering
+
+The WDS configs use bovine rhodopsin numbering for residue-site selection:
+
+```json
+"reference_sequence_id": "Bovine",
+"reference_sequence_path": "../datasets/wds/fastas/Bovine.fasta",
+"reference_residue_sites": [46, 49, 52, 83, 86, 90, 93, 118, 122, 124, 132, 180, 197, 230, 233, 277, 285, 292, 298, 299, 300, 308],
+"site_gap_strategy": "next"
+```
+
+The pipeline aligns Bovine to `reference_alignment`, maps those 1-based bovine residue numbers to alignment columns, then cuts corresponding residues from each query PDB.
+
+Useful site sets from Hagen et al. 2023:
+
+- Figure 3 broad vertebrate sites: `46,49,52,83,86,90,93,118,122,124,132,180,197,230,233,277,285,292,298,299,300,308`
+- Rh1 example sites: `83,122,292,299,300`
+- SWS1 example sites: `86,90,93,118`
+- SWS1 mammalian sites discussed in text: `46,49,50,52,86,90,93,114,118`
+- LWS/MWS five-site rule: `180,197,277,285,308`
+
+To use a different set, edit `reference_residue_sites` in `configs/preprocess.wds.json` and `configs/predict.wds.example.json`, or regenerate configs:
+
+```bash
+python -m opsigen prepare-wds \
+  --meta /path/to/wds_meta.tsv \
+  --fasta /path/to/wds.fasta \
+  --pdb-dir /path/to/pdb_folder \
+  --reference-residue-sites 83,122,292,299,300
+```

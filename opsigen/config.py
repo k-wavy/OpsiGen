@@ -290,6 +290,10 @@ class PreprocessConfig:
     chem_lib_path: Path | None = None
     amino_mapping_path: Path = Path("feature_maker/add_amino_acid_features/amino_mapping")
     aligned_positions: tuple[int, ...] = DEFAULT_ALIGNED_POSITIONS
+    reference_sequence_id: str | None = None
+    reference_sequence_path: Path | None = None
+    reference_residue_sites: tuple[int, ...] | None = None
+    site_gap_strategy: str = "next"
     original_feature_length: int = 18
 
     @classmethod
@@ -331,6 +335,14 @@ class PreprocessConfig:
                 "preprocessing.amino_mapping_path",
             ),
             aligned_positions=tuple(int(i) for i in source.get("aligned_positions", DEFAULT_ALIGNED_POSITIONS)),
+            reference_sequence_id=source.get("reference_sequence_id"),
+            reference_sequence_path=resolve_path(source.get("reference_sequence_path"), base_dir),
+            reference_residue_sites=(
+                tuple(int(i) for i in source["reference_residue_sites"])
+                if source.get("reference_residue_sites")
+                else None
+            ),
+            site_gap_strategy=str(source.get("site_gap_strategy", "next")),
             original_feature_length=int(source.get("original_feature_length", 18)),
         )
 

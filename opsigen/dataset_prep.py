@@ -17,6 +17,30 @@ from .exceptions import InputValidationError
 from .preprocessing.pipeline import parse_fasta, sanitize_id
 
 STANDARD_AMINO_ACIDS = set("ARNDCQEGHILKMFPSTWYV")
+HAGEN_FIGURE3_VERTEBRATE_SITES = [
+    46,
+    49,
+    52,
+    83,
+    86,
+    90,
+    93,
+    118,
+    122,
+    124,
+    132,
+    180,
+    197,
+    230,
+    233,
+    277,
+    285,
+    292,
+    298,
+    299,
+    300,
+    308,
+]
 
 
 @dataclass(frozen=True)
@@ -91,6 +115,8 @@ def prepare_wds_dataset(
     feature_maker_binary: str | Path = "feature_maker/interface2grid",
     chem_lib_path: str | Path = "feature_maker/chem.lib",
     amino_mapping_path: str | Path = "feature_maker/add_amino_acid_features/amino_mapping",
+    reference_sequence_id: str = "Bovine",
+    reference_residue_sites: list[int] | None = None,
     train_fraction: float = 0.8,
     seed: int = 7,
 ) -> PreparedWDSDataset:
@@ -113,6 +139,8 @@ def prepare_wds_dataset(
     splits_dir = output_dir / "splits"
     copied_dir = output_dir / "source"
     copied_dir.mkdir(parents=True, exist_ok=True)
+    if reference_residue_sites is None:
+        reference_residue_sites = HAGEN_FIGURE3_VERTEBRATE_SITES
 
     meta = pd.read_csv(meta_path, sep="\t")
     required_columns = {"Seq_Id", "Lambda_Max", "Species", "Opsin_Family", "Accession"}
@@ -244,6 +272,13 @@ def prepare_wds_dataset(
                 "input_manifest": _relative_from_file(preprocess_manifest, preprocess_config),
                 "preprocessing": {
                     "reference_alignment": _relative_path((repo_root / reference_alignment).resolve(), configs_dir),
+                    "reference_sequence_id": reference_sequence_id,
+                    "reference_sequence_path": _relative_path(
+                        (fastas_dir / f"{sanitize_id(reference_sequence_id)}.fasta").resolve(),
+                        configs_dir,
+                    ),
+                    "reference_residue_sites": reference_residue_sites,
+                    "site_gap_strategy": "next",
                     "output_dir": "../runs/preprocess/wds",
                     "mafft_executable": "mafft",
                     "feature_maker_binary": _relative_path((repo_root / feature_maker_binary).resolve(), configs_dir),
@@ -324,6 +359,13 @@ def prepare_wds_dataset(
                 },
                 "preprocessing": {
                     "reference_alignment": _relative_path((repo_root / reference_alignment).resolve(), configs_dir),
+                    "reference_sequence_id": reference_sequence_id,
+                    "reference_sequence_path": _relative_path(
+                        (fastas_dir / f"{sanitize_id(reference_sequence_id)}.fasta").resolve(),
+                        configs_dir,
+                    ),
+                    "reference_residue_sites": reference_residue_sites,
+                    "site_gap_strategy": "next",
                     "output_dir": "../runs/predict/wds/preprocessed",
                     "mafft_executable": "mafft",
                     "feature_maker_binary": _relative_path((repo_root / feature_maker_binary).resolve(), configs_dir),

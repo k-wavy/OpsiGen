@@ -13,6 +13,7 @@
   },
   "preprocessing": {
     "reference_alignment": "../excel/sequences.fas",
+    "aligned_positions": [429, 465, 469, 597, 599, 600, 603, 604, 607, 651, 652, 655, 687, 690, 691, 694, 774, 777, 778, 781, 828, 832, 835, 836],
     "output_dir": "../runs/predict/example/preprocessed",
     "mafft_executable": "mafft",
     "feature_maker_binary": "../feature_maker/interface2grid",

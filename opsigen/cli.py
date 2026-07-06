@@ -39,6 +39,12 @@ def build_parser() -> argparse.ArgumentParser:
     prepare_wds_parser.add_argument("--pdb-dir", type=Path, default=None, help="Optional directory containing PDB files.")
     prepare_wds_parser.add_argument("--train-fraction", type=float, default=0.8)
     prepare_wds_parser.add_argument("--seed", type=int, default=7)
+    prepare_wds_parser.add_argument("--reference-sequence-id", default="Bovine")
+    prepare_wds_parser.add_argument(
+        "--reference-residue-sites",
+        default=None,
+        help="Comma-separated 1-based reference residue sites, e.g. 83,122,292,299,300.",
+    )
 
     return parser
 
@@ -77,6 +83,12 @@ def main(argv: list[str] | None = None) -> None:
                 pdb_dir=args.pdb_dir,
                 train_fraction=args.train_fraction,
                 seed=args.seed,
+                reference_sequence_id=args.reference_sequence_id,
+                reference_residue_sites=(
+                    [int(value) for value in args.reference_residue_sites.split(",") if value.strip()]
+                    if args.reference_residue_sites
+                    else None
+                ),
             )
             print(f"WDS dataset prepared: {result.output_dir}")
             print(f"Training table: {result.training_excel}")

@@ -60,6 +60,8 @@ python -m opsigen preprocess --config configs/preprocess.wds.json
 python -m opsigen train --config configs/train.wds.json
 ```
 
+The WDS configs use Bovine as `reference_sequence_id` and bovine-numbered spectral tuning sites from Hagen et al. 2023. Edit `preprocessing.reference_residue_sites` to change which residues become GNN nodes.
+
 The training entry point performs configuration loading, input validation, dataset normalization, weighted sampling, model construction, training/evaluation, checkpointing, metrics logging, and metadata writing.
 
 Training outputs are written under `outputs.output_dir`, for example:

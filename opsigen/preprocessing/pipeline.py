@@ -103,6 +103,16 @@ def read_aligned_sequence(path: Path, name: str) -> str:
     )
 
 
+def find_fasta_record(path: Path, name: str) -> FastaRecord | None:
+    """Find a FASTA record by exact name or first whitespace-delimited token."""
+
+    name_token = name.split()[0]
+    for record in parse_fasta(path):
+        if record.name == name or record.name.split()[0] == name_token:
+            return record
+    return None
+
+
 def run_mafft_add(
     *,
     query_fasta: Path,
@@ -160,6 +170,116 @@ def residue_positions_from_alignment(
         ungapped_before = len(aligned_sequence[:position].replace("-", ""))
         positions.append(ungapped_before + int(aligned_sequence[position - 1] == "-"))
     return positions
+
+
+def alignment_columns_for_reference_sites(
+    reference_aligned_sequence: str,
+    reference_residue_sites: Iterable[int],
+) -> dict[int, int]:
+    """Map 1-based reference residue numbers to 0-based alignment columns."""
+
+    requested = [int(site) for site in reference_residue_sites]
+    requested_set = set(requested)
+    columns: dict[int, int] = {}
+    ungapped_position = 0
+    for column, residue in enumerate(reference_aligned_sequence):
+        if residue == "-":
+            continue
+        ungapped_position += 1
+        if ungapped_position in requested_set:
+            columns[ungapped_position] = column
+    missing = [site for site in requested if site not in columns]
+    if missing:
+        raise InputValidationError(
+            "Reference residue site(s) were not found in the aligned reference sequence: "
+            f"{missing}. Check reference_sequence_id/reference_sequence_path and numbering."
+        )
+    return columns
+
+
+def residue_positions_from_reference_sites(
+    query_aligned_sequence: str,
+    reference_aligned_sequence: str,
+    reference_residue_sites: Iterable[int],
+    *,
+    gap_strategy: str = "next",
+) -> list[int]:
+    """Convert reference residue numbers to query residue positions.
+
+    ``reference_residue_sites`` are 1-based positions in the ungapped reference
+    sequence, for example bovine rhodopsin numbering from Hagen et al. The
+    returned positions are 1-based residue numbers in the query structure.
+    """
+
+    if gap_strategy not in {"next", "skip", "error"}:
+        raise InputValidationError(
+            f"Invalid site_gap_strategy={gap_strategy!r}; expected one of: next, skip, error."
+        )
+
+    site_to_column = alignment_columns_for_reference_sites(
+        reference_aligned_sequence,
+        reference_residue_sites,
+    )
+    positions: list[int] = []
+    for site in reference_residue_sites:
+        column = site_to_column[int(site)]
+        if column >= len(query_aligned_sequence):
+            raise InputValidationError(
+                f"Alignment column {column + 1} for reference site {site} is outside query alignment."
+            )
+        if query_aligned_sequence[column] != "-":
+            positions.append(len(query_aligned_sequence[: column + 1].replace("-", "")))
+            continue
+        if gap_strategy == "skip":
+            LOGGER.warning("Skipping reference site %s because query has a gap at that alignment column.", site)
+            continue
+        if gap_strategy == "error":
+            raise InputValidationError(
+                f"Query has a gap at reference site {site}; set site_gap_strategy='skip' or 'next' to continue."
+            )
+        next_position = len(query_aligned_sequence[:column].replace("-", "")) + 1
+        ungapped_length = len(query_aligned_sequence.replace("-", ""))
+        if next_position > ungapped_length:
+            LOGGER.warning("Skipping reference site %s because query gap is after the last residue.", site)
+            continue
+        LOGGER.warning(
+            "Reference site %s maps to a query gap; using next query residue position %s.",
+            site,
+            next_position,
+        )
+        positions.append(next_position)
+    return positions
+
+
+def resolve_reference_aligned_sequence(config: PreprocessConfig) -> str:
+    """Resolve the aligned reference sequence used for reference-residue numbering."""
+
+    if not config.reference_residue_sites:
+        raise InputValidationError("No reference_residue_sites were configured.")
+    if not config.reference_sequence_id:
+        raise InputValidationError(
+            "reference_residue_sites requires preprocessing.reference_sequence_id, "
+            "for example 'Bovine'."
+        )
+
+    existing_record = find_fasta_record(config.reference_alignment, config.reference_sequence_id)
+    if existing_record is not None:
+        return existing_record.sequence
+
+    if config.reference_sequence_path is None:
+        raise InputValidationError(
+            f"Reference sequence {config.reference_sequence_id!r} was not found in "
+            f"{config.reference_alignment}. Set preprocessing.reference_sequence_path."
+        )
+
+    output_alignment = config.output_dir / "reference_alignments" / f"{sanitize_id(config.reference_sequence_id)}.fasta"
+    run_mafft_add(
+        query_fasta=config.reference_sequence_path,
+        reference_alignment=config.reference_alignment,
+        output_alignment=output_alignment,
+        mafft_executable=config.mafft_executable,
+    )
+    return read_aligned_sequence(output_alignment, config.reference_sequence_id)
 
 
 def cut_pdb_to_residues(input_pdb: Path, output_pdb: Path, residue_numbers: Iterable[int]) -> None:
@@ -378,6 +498,11 @@ def preprocess_opsins(
     config.output_dir.mkdir(parents=True, exist_ok=True)
     cut_dir = config.output_dir / "cut_pdbs"
     cut_dir.mkdir(parents=True, exist_ok=True)
+    reference_aligned_sequence = (
+        resolve_reference_aligned_sequence(config)
+        if config.reference_residue_sites
+        else None
+    )
 
     for item in planned:
         fasta_record = read_single_fasta(item.fasta_path)
@@ -388,10 +513,18 @@ def preprocess_opsins(
             mafft_executable=config.mafft_executable,
         )
         aligned_sequence = read_aligned_sequence(item.alignment_path, fasta_record.name)
-        residue_numbers = residue_positions_from_alignment(
-            aligned_sequence,
-            config.aligned_positions,
-        )
+        if reference_aligned_sequence is not None and config.reference_residue_sites is not None:
+            residue_numbers = residue_positions_from_reference_sites(
+                aligned_sequence,
+                reference_aligned_sequence,
+                config.reference_residue_sites,
+                gap_strategy=config.site_gap_strategy,
+            )
+        else:
+            residue_numbers = residue_positions_from_alignment(
+                aligned_sequence,
+                config.aligned_positions,
+            )
         LOGGER.info("Cutting %s to %s selected residue positions.", item.pdb_path, len(residue_numbers))
         cut_pdb_to_residues(item.pdb_path, item.cut_pdb_path, residue_numbers)
 
