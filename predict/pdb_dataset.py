@@ -15,6 +15,8 @@ class PDBDatasetConfig:
     graph_dists_path = '/cs/labs/dina/meitar/rhodopsins/their_graph/'
     graph_features_path = '/cs/labs/dina/meitar/ionet-meitar/Interface_grid/new_features/24_acids_with_atoms/'
     indexes = []
+    means_path = "means.npy"
+    stds_path = "stds.npy"
 
 
 class PDBDataset(Dataset):
@@ -52,8 +54,15 @@ class PDBDataset(Dataset):
             means[-3:] = 0
             stds[-3:] = 1
 
-        np.save("means.npy", means)
-        np.save("stds.npy", stds)
+        means_path = getattr(self.config, "means_path", "means.npy")
+        stds_path = getattr(self.config, "stds_path", "stds.npy")
+        for path in (means_path, stds_path):
+            directory = os.path.dirname(os.path.abspath(path))
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+
+        np.save(means_path, means)
+        np.save(stds_path, stds)
 
         return means, stds
 
@@ -72,7 +81,7 @@ class PDBDataset(Dataset):
         return weights
 
     def __len__(self):
-        return self.excel_data.shape[0] - 1
+        return self.excel_data.shape[0]
 
     @staticmethod
     def read_graph(dists_file_name, features_file_name, indexes):
@@ -85,10 +94,17 @@ class PDBDataset(Dataset):
             features = np.load(features_file_name)
             assert len(features.shape) == 2
 
+        if features is None or dists is None:
+            return features, dists
+
         return features[:, indexes], dists
 
     def get_specific_item(self, graph_path, features_path, indexes=range(FEATURE_LENGTH)):
         features, dists = PDBDataset.read_graph(graph_path,features_path, indexes)
+        if features is None or dists is None:
+            raise FileNotFoundError(
+                f"Could not load graph features or distances from {features_path} and {graph_path}"
+            )
         normalized_features = (features[:, self.stds != 0] - self.means[self.stds != 0]) / self.stds[self.stds != 0]
 
         return normalized_features, dists

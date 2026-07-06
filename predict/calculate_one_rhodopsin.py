@@ -58,6 +58,8 @@ def generate_dataset_config(config):
     dataset_config.graph_dists_path = config["graph_dists_path"]
     dataset_config.graph_features_path = config["graph_features_path"]
     dataset_config.indexes = config["indexes_to_keep"]
+    dataset_config.means_path = config.get("means_path", "means.npy")
+    dataset_config.stds_path = config.get("stds_path", "stds.npy")
 
     return dataset_config
 
@@ -72,8 +74,8 @@ def main():
     with open(args.pickle_file, 'rb') as f:
         model = pickle.load(f).to(device)
 
-    means = np.load("means.npy")
-    stds = np.load("stds.npy")
+    means = np.load(config.get("means_path", "means.npy"))
+    stds = np.load(config.get("stds_path", "stds.npy"))
     train_dataset = PDBDataset(generate_dataset_config(config), config["train_wildtypes_list"], normalize_last=config["dataset_normalize_last"], means=means, stds=stds)
 
     normalized_features, dists = train_dataset.get_specific_item(args.dists_file, args.features_file, range(36))

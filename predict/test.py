@@ -18,7 +18,6 @@ import argparse
 import wandb
 
 FILE_PATH = '/mnt/c/Users/zlils/Documents/university/biology/rhodopsins/excel/data.xlsx'
-os.environ["WANDB_API_KEY"] = "5ac206c34b33ff51b16fb8dcdb2efaa69943e237"
 
 def calculate_l1_reg(model):
     return 0.0001 * sum(torch.norm(p, 1) for p in model.parameters())
