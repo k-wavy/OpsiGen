@@ -34,7 +34,7 @@ The old workflow required manually running `pipeline_auto/run.sh` and then `pred
 ## Behavior Preserved
 
 - The same 24 aligned opsin positions are used by default.
-- MAFFT still uses `--add` and `--keeplength`.
+- MAFFT still uses `--add` and `--keeplength` when adding new records to an existing reference MSA. WDS reference-site preprocessing can also build the shared animal-opsin MSA from `reference_alignment_input`.
 - The native `feature_maker/interface2grid` binary is still used for atom features.
 - Amino-acid descriptors from `feature_maker/add_amino_acid_features/amino_mapping` are still appended to atom features.
 - Distance matrices still use inverse pairwise atom distances with self-distances set to zero.

@@ -283,8 +283,9 @@ def load_opsin_manifest(path: Path) -> list[dict[str, Any]]:
 class PreprocessConfig:
     """Configuration for FASTA/PDB to graph preprocessing."""
 
-    reference_alignment: Path
     output_dir: Path
+    reference_alignment: Path
+    reference_alignment_input: Path | None = None
     mafft_executable: str = "mafft"
     feature_maker_binary: Path = Path("feature_maker/interface2grid")
     chem_lib_path: Path | None = None
@@ -301,6 +302,7 @@ class PreprocessConfig:
         preprocessing = _mapping_at(mapping, "preprocessing")
         source = preprocessing or mapping
         reference_value = _get_nested(source, ("reference_alignment", "sequences"))
+        reference_alignment_input = resolve_path(source.get("reference_alignment_input"), base_dir)
         output_value = _get_nested(source, ("output_dir", "preprocessed_dir"), "runs/preprocess")
         feature_maker_binary = require_path(
             source.get(
@@ -319,8 +321,9 @@ class PreprocessConfig:
             else feature_maker_binary.parent / "chem.lib"
         )
         return cls(
-            reference_alignment=require_path(reference_value, base_dir, "preprocessing.reference_alignment"),
             output_dir=require_path(output_value, base_dir, "preprocessing.output_dir"),
+            reference_alignment=require_path(reference_value, base_dir, "preprocessing.reference_alignment"),
+            reference_alignment_input=reference_alignment_input,
             mafft_executable=str(source.get("mafft_executable", "mafft")),
             feature_maker_binary=feature_maker_binary,
             chem_lib_path=chem_lib_path,

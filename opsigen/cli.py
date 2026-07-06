@@ -41,6 +41,15 @@ def build_parser() -> argparse.ArgumentParser:
     prepare_wds_parser.add_argument("--seed", type=int, default=7)
     prepare_wds_parser.add_argument("--reference-sequence-id", default="Bovine")
     prepare_wds_parser.add_argument(
+        "--reference-alignment",
+        type=Path,
+        default=None,
+        help=(
+            "Optional precomputed animal-opsin MSA. If omitted, preprocessing builds "
+            "datasets/wds/reference/wds_reference_alignment.fasta from the WDS FASTA."
+        ),
+    )
+    prepare_wds_parser.add_argument(
         "--reference-residue-sites",
         default=None,
         help="Comma-separated 1-based reference residue sites, e.g. 83,122,292,299,300.",
@@ -84,6 +93,7 @@ def main(argv: list[str] | None = None) -> None:
                 train_fraction=args.train_fraction,
                 seed=args.seed,
                 reference_sequence_id=args.reference_sequence_id,
+                reference_alignment=args.reference_alignment,
                 reference_residue_sites=(
                     [int(value) for value in args.reference_residue_sites.split(",") if value.strip()]
                     if args.reference_residue_sites

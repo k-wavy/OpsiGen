@@ -106,11 +106,95 @@ def read_aligned_sequence(path: Path, name: str) -> str:
 def find_fasta_record(path: Path, name: str) -> FastaRecord | None:
     """Find a FASTA record by exact name or first whitespace-delimited token."""
 
+    return find_fasta_record_in_records(parse_fasta(path), name)
+
+
+def find_fasta_record_in_records(records: Iterable[FastaRecord], name: str) -> FastaRecord | None:
+    """Find a FASTA record in a parsed collection by exact name or first token."""
+
     name_token = name.split()[0]
-    for record in parse_fasta(path):
+    for record in records:
         if record.name == name or record.name.split()[0] == name_token:
             return record
     return None
+
+
+def validate_alignment(records: Iterable[FastaRecord], path: Path) -> list[FastaRecord]:
+    """Validate and return parsed records from an aligned FASTA."""
+
+    parsed = list(records)
+    if not parsed:
+        raise InputValidationError(f"Reference alignment contains no records: {path}")
+    lengths = {len(record.sequence) for record in parsed}
+    if len(lengths) != 1:
+        sample = ", ".join(str(length) for length in sorted(lengths)[:5])
+        raise InputValidationError(
+            f"Reference alignment must be a multiple sequence alignment with equal-length records: {path}. "
+            f"Observed sequence lengths include: {sample}. If you only have unaligned sequences, set "
+            "preprocessing.reference_alignment_input and let OpsiGen build the MSA with MAFFT."
+        )
+    return parsed
+
+
+def read_alignment(path: Path) -> list[FastaRecord]:
+    """Read and validate a multiple sequence alignment."""
+
+    return validate_alignment(parse_fasta(path), path)
+
+
+def run_mafft_align(
+    *,
+    input_fasta: Path,
+    output_alignment: Path,
+    mafft_executable: str,
+) -> None:
+    """Run MAFFT to build a de novo multiple sequence alignment."""
+
+    if shutil.which(mafft_executable) is None and not Path(mafft_executable).exists():
+        raise ExternalToolError(
+            f"MAFFT executable was not found: {mafft_executable}. "
+            "Install MAFFT or set preprocessing.mafft_executable."
+        )
+    if not input_fasta.exists():
+        raise InputValidationError(f"Reference alignment input does not exist: {input_fasta}")
+
+    output_alignment.parent.mkdir(parents=True, exist_ok=True)
+    command = [mafft_executable, "--auto", str(input_fasta)]
+    LOGGER.info("Building reference MSA with MAFFT: %s", output_alignment)
+    with output_alignment.open("w") as stdout:
+        completed = subprocess.run(
+            command,
+            stdout=stdout,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+    if completed.returncode != 0:
+        raise ExternalToolError(
+            f"MAFFT failed while building {output_alignment} with exit code {completed.returncode}:\n"
+            f"{completed.stderr.strip()}"
+        )
+
+
+def ensure_reference_alignment(config: PreprocessConfig) -> list[FastaRecord]:
+    """Return a validated reference MSA, building it from unaligned input when configured."""
+
+    if config.reference_alignment.exists():
+        return read_alignment(config.reference_alignment)
+
+    if config.reference_alignment_input is None:
+        raise InputValidationError(
+            f"Reference alignment does not exist: {config.reference_alignment}. "
+            "Provide an aligned FASTA at preprocessing.reference_alignment, or set "
+            "preprocessing.reference_alignment_input to an unaligned FASTA that MAFFT can align."
+        )
+
+    run_mafft_align(
+        input_fasta=config.reference_alignment_input,
+        output_alignment=config.reference_alignment,
+        mafft_executable=config.mafft_executable,
+    )
+    return read_alignment(config.reference_alignment)
 
 
 def run_mafft_add(
@@ -280,6 +364,24 @@ def resolve_reference_aligned_sequence(config: PreprocessConfig) -> str:
         mafft_executable=config.mafft_executable,
     )
     return read_aligned_sequence(output_alignment, config.reference_sequence_id)
+
+
+def write_record_alignment_snapshot(
+    *,
+    path: Path,
+    reference_name: str | None,
+    reference_sequence: str | None,
+    query_name: str,
+    query_sequence: str,
+) -> None:
+    """Write the alignment rows used to map one record, for auditability."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows: list[str] = []
+    if reference_name is not None and reference_sequence is not None:
+        rows.append(f">{reference_name}\n{reference_sequence}")
+    rows.append(f">{query_name}\n{query_sequence}")
+    path.write_text("\n".join(rows) + "\n")
 
 
 def cut_pdb_to_residues(input_pdb: Path, output_pdb: Path, residue_numbers: Iterable[int]) -> None:
@@ -498,29 +600,62 @@ def preprocess_opsins(
     config.output_dir.mkdir(parents=True, exist_ok=True)
     cut_dir = config.output_dir / "cut_pdbs"
     cut_dir.mkdir(parents=True, exist_ok=True)
-    reference_aligned_sequence = (
-        resolve_reference_aligned_sequence(config)
-        if config.reference_residue_sites
-        else None
-    )
+    reference_alignment_records = ensure_reference_alignment(config)
+    reference_record: FastaRecord | None = None
+    if config.reference_residue_sites:
+        if not config.reference_sequence_id:
+            raise InputValidationError(
+                "reference_residue_sites requires preprocessing.reference_sequence_id, for example 'Bovine'."
+            )
+        reference_record = find_fasta_record_in_records(
+            reference_alignment_records,
+            config.reference_sequence_id,
+        )
+        if reference_record is None:
+            reference_sequence = resolve_reference_aligned_sequence(config)
+            reference_record = FastaRecord(config.reference_sequence_id, reference_sequence)
 
     for item in planned:
         fasta_record = read_single_fasta(item.fasta_path)
-        run_mafft_add(
-            query_fasta=item.fasta_path,
-            reference_alignment=config.reference_alignment,
-            output_alignment=item.alignment_path,
-            mafft_executable=config.mafft_executable,
-        )
-        aligned_sequence = read_aligned_sequence(item.alignment_path, fasta_record.name)
-        if reference_aligned_sequence is not None and config.reference_residue_sites is not None:
+        if reference_record is not None and config.reference_residue_sites is not None:
+            query_record = find_fasta_record_in_records(reference_alignment_records, fasta_record.name)
+            if query_record is None:
+                run_mafft_add(
+                    query_fasta=item.fasta_path,
+                    reference_alignment=config.reference_alignment,
+                    output_alignment=item.alignment_path,
+                    mafft_executable=config.mafft_executable,
+                )
+                query_sequence = read_aligned_sequence(item.alignment_path, fasta_record.name)
+            else:
+                query_sequence = query_record.sequence
+                write_record_alignment_snapshot(
+                    path=item.alignment_path,
+                    reference_name=reference_record.name,
+                    reference_sequence=reference_record.sequence,
+                    query_name=query_record.name,
+                    query_sequence=query_sequence,
+                )
+            if len(query_sequence) != len(reference_record.sequence):
+                raise InputValidationError(
+                    f"Aligned query {fasta_record.name!r} has length {len(query_sequence)}, but reference "
+                    f"{reference_record.name!r} has length {len(reference_record.sequence)}. Check that both "
+                    "sequences are in the same multiple sequence alignment."
+                )
             residue_numbers = residue_positions_from_reference_sites(
-                aligned_sequence,
-                reference_aligned_sequence,
+                query_sequence,
+                reference_record.sequence,
                 config.reference_residue_sites,
                 gap_strategy=config.site_gap_strategy,
             )
         else:
+            run_mafft_add(
+                query_fasta=item.fasta_path,
+                reference_alignment=config.reference_alignment,
+                output_alignment=item.alignment_path,
+                mafft_executable=config.mafft_executable,
+            )
+            aligned_sequence = read_aligned_sequence(item.alignment_path, fasta_record.name)
             residue_numbers = residue_positions_from_alignment(
                 aligned_sequence,
                 config.aligned_positions,

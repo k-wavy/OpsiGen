@@ -111,7 +111,7 @@ def prepare_wds_dataset(
     output_dir: str | Path,
     configs_dir: str | Path,
     pdb_dir: str | Path | None = None,
-    reference_alignment: str | Path = "excel/sequences.fas",
+    reference_alignment: str | Path | None = None,
     feature_maker_binary: str | Path = "feature_maker/interface2grid",
     chem_lib_path: str | Path = "feature_maker/chem.lib",
     amino_mapping_path: str | Path = "feature_maker/add_amino_acid_features/amino_mapping",
@@ -138,9 +138,17 @@ def prepare_wds_dataset(
     fastas_dir = output_dir / "fastas"
     splits_dir = output_dir / "splits"
     copied_dir = output_dir / "source"
+    reference_dir = output_dir / "reference"
     copied_dir.mkdir(parents=True, exist_ok=True)
+    reference_dir.mkdir(parents=True, exist_ok=True)
     if reference_residue_sites is None:
         reference_residue_sites = HAGEN_FIGURE3_VERTEBRATE_SITES
+    if reference_alignment is None:
+        reference_alignment_path = reference_dir / "wds_reference_alignment.fasta"
+        reference_alignment_input_path = copied_dir / fasta_path.name
+    else:
+        reference_alignment_path = (repo_root / reference_alignment).resolve()
+        reference_alignment_input_path = copied_dir / fasta_path.name
 
     meta = pd.read_csv(meta_path, sep="\t")
     required_columns = {"Seq_Id", "Lambda_Max", "Species", "Opsin_Family", "Accession"}
@@ -271,7 +279,8 @@ def prepare_wds_dataset(
             {
                 "input_manifest": _relative_from_file(preprocess_manifest, preprocess_config),
                 "preprocessing": {
-                    "reference_alignment": _relative_path((repo_root / reference_alignment).resolve(), configs_dir),
+                    "reference_alignment": _relative_path(reference_alignment_path, configs_dir),
+                    "reference_alignment_input": _relative_path(reference_alignment_input_path, configs_dir),
                     "reference_sequence_id": reference_sequence_id,
                     "reference_sequence_path": _relative_path(
                         (fastas_dir / f"{sanitize_id(reference_sequence_id)}.fasta").resolve(),
@@ -358,7 +367,8 @@ def prepare_wds_dataset(
                     "device": "auto",
                 },
                 "preprocessing": {
-                    "reference_alignment": _relative_path((repo_root / reference_alignment).resolve(), configs_dir),
+                    "reference_alignment": _relative_path(reference_alignment_path, configs_dir),
+                    "reference_alignment_input": _relative_path(reference_alignment_input_path, configs_dir),
                     "reference_sequence_id": reference_sequence_id,
                     "reference_sequence_path": _relative_path(
                         (fastas_dir / f"{sanitize_id(reference_sequence_id)}.fasta").resolve(),

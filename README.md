@@ -52,6 +52,7 @@ python -m opsigen prepare-wds \
 ```
 
 If the PDB directory is not available yet, omit `--pdb-dir`; this still creates the training table, FASTA records, split files, and config templates. Re-run the same command with `--pdb-dir` before preprocessing.
+Use the unaligned sequence FASTA for `--fasta`; the WDS preprocessing config builds a shared animal-opsin MSA with MAFFT and maps bovine-numbered reference sites through that alignment.
 
 Then run:
 
