@@ -1,87 +1,40 @@
-import torch
-import numpy as np
-import torch.nn as nn
-from torch import optim
-import pickle
-from torch.utils.data import DataLoader, WeightedRandomSampler
-from itertools import product
-import pickle
-import os
-import json
-import time
-from pdb_dataset import PDBDataset, PDBDatasetConfig
+"""Deprecated compatibility entry point for single-graph prediction.
+
+Prefer:
+
+    python -m opsigen predict --config configs/predict.example.json
+"""
+
+from __future__ import annotations
+
 import argparse
+import sys
+from pathlib import Path
 
-def calculate_l1_reg(model):
-    return 0.0001 * sum(torch.norm(p, 1) for p in model.parameters())
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-def get_pickel_name(base_name, test_error, start_time):
-    result = base_name + "_" + "YAY" + "_" + str("{0:.1f}".format(test_error)) + "_" + start_time
-    return result
-
+from opsigen.prediction import legacy_predict_one
 
 
-def calculate_energy_loss(pred, gt):
-    EV = 1239.8
-
-    if (pred < 3 or gt < 3):
-        return 7
-
-    return (EV / pred) - (EV / gt)
-
-def parse_arguments():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("config_path")
-    parser.add_argument("pickle_file")
-    parser.add_argument("output_file")
-    parser.add_argument("features_file")
-    parser.add_argument("dists_file")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Deprecated wrapper around opsigen prediction.")
+    parser.add_argument("config_path", type=Path)
+    parser.add_argument("pickle_file", type=Path)
+    parser.add_argument("output_file", type=Path)
+    parser.add_argument("features_file", type=Path)
+    parser.add_argument("dists_file", type=Path)
     args = parser.parse_args()
+    prediction = legacy_predict_one(
+        config_path=args.config_path,
+        model_path=args.pickle_file,
+        output_file=args.output_file,
+        features_path=args.features_file,
+        dists_path=args.dists_file,
+    )
+    print(f"absorption wavelength is {prediction}")
 
-    print(args)
-
-    return args
-
-def set_config(config_file):
-    config = dict()
-    with open(config_file, "r") as f:
-        data = json.load(f)
-
-    print(data)
-    config = data
-
-    return config
-
-def generate_dataset_config(config):
-    dataset_config = PDBDatasetConfig()
-    dataset_config.excel_path = config["excel_path"]
-    dataset_config.graph_dists_path = config["graph_dists_path"]
-    dataset_config.graph_features_path = config["graph_features_path"]
-    dataset_config.indexes = config["indexes_to_keep"]
-
-    return dataset_config
-
-
-def main():
-    print("Hello!")
-    args = parse_arguments()
-    config = set_config(args.config_path)
-    t = str(time.time())
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    to_load = False
-    with open(args.pickle_file, 'rb') as f:
-        model = pickle.load(f).to(device)
-
-    means = np.load("means.npy")
-    stds = np.load("stds.npy")
-    train_dataset = PDBDataset(generate_dataset_config(config), config["train_wildtypes_list"], normalize_last=config["dataset_normalize_last"], means=means, stds=stds)
-
-    normalized_features, dists = train_dataset.get_specific_item(args.dists_file, args.features_file, range(36))
-
-    result = model.double().forward(torch.tensor(normalized_features), torch.tensor(dists), config["graph_th"])
-    print("outputing to" + str(args.output_file))
-    with open(args.output_file, "w") as f:
-        f.write("absorption wavelength is " + str(result.item()))
 
 if __name__ == "__main__":
     main()

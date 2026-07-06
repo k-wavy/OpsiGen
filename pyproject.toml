@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "opsigen"
+version = "0.2.0"
+description = "Geometric deep-learning pipeline for rhodopsin absorption wavelength prediction."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "biopython",
+  "numpy",
+  "pandas",
+  "pyyaml",
+  "scipy",
+  "torch",
+  "torch-geometric",
+  "tqdm"
+]
+
+[project.optional-dependencies]
+tracking = ["wandb"]
+
+[project.scripts]
+opsigen = "opsigen.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["opsigen*"]

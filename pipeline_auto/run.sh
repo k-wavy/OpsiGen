@@ -1,7 +1,7 @@
-rm -rf ./dists
-rm -rf ./features
-rm -rf ./cutted_parts
-mkdir ./dists
-mkdir ./features
-mkdir ./cutted_parts
-python ./main.py ./config.json
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+CONFIG_PATH="${1:-${SCRIPT_DIR}/config.json}"
+PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}" python -m opsigen preprocess --config "${CONFIG_PATH}"

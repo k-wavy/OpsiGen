@@ -1,49 +1,32 @@
+"""Deprecated compatibility entry point for graph preprocessing.
+
+Prefer:
+
+    python -m opsigen preprocess --config configs/predict.example.json
 """
-generate graph features.
-Generate nodes with physio-chemical descriptors. Cut only the 24 relevant amino acids.
-Generate graph edges between nodes x,y such that the edge will be 1/d(x,y).
-"""
-import os
 
-import aligner_plus as aligner
-import cutter
-from config import parse_args
+from __future__ import annotations
 
+import argparse
+import sys
+from pathlib import Path
 
-def generate_pdb(config):
-    """
-    Cut the relevant amino acids from the given pdb acording to the config.
-    """
-    aligner_obj = aligner.Aligner(config)
-    pdb_cutter = cutter.Cutter(config)
-    pdb_cutter.cut_pdb(aligner_obj)
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-def generate_features(config):
-    """
-    generate graph features (nodes with descriptors, graph edges) according to the config
-    """
-    print("Creating atom features...")
-    cmd = f"{config['feature_maker_script']} {config['cutted_parts_dir']} {config['features']}"
-    os.system(cmd)
-    print("Creating amino acids features...")
-    cmd = f"{config['amino_acid_feature_script']} \
-            {config['cutted_parts_dir']} {config['features']} {config['features']}"
-    os.system(cmd)
-    print("Creating graph edges...")
-    cmd = f"python {config['graph_maker_script']} \
-            {config['cutted_parts_dir']} {config['edge_dists_path']}"
-    os.system(cmd)
-
-    print("Done!")
+from opsigen.config import PreprocessRunConfig
+from opsigen.preprocessing import preprocess_opsins
 
 
-def main():
-    """
-    run main function of this module
-    """
-    config = parse_args()
-    generate_pdb(config)
-    generate_features(config)
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Deprecated wrapper around opsigen preprocess.")
+    parser.add_argument("config_file", type=Path)
+    args = parser.parse_args()
+    config = PreprocessRunConfig.from_file(args.config_file)
+    records = preprocess_opsins(config.records, config.preprocessing)
+    print(f"Preprocessing complete: {config.preprocessing.output_dir}")
+    print(f"Processed records: {len(records)}")
 
 
 if __name__ == "__main__":

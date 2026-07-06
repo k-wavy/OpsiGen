@@ -1,0 +1,2 @@
+id,fasta_path,pdb_path
+sample_opsin,../pipeline_auto/sample_fasta.fasta,../pipeline_auto/sample_pdb.pdb
