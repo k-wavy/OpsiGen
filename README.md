@@ -62,8 +62,17 @@ python -m opsigen train --config configs/train.wds.json
 ```
 
 The WDS configs use Bovine as `reference_sequence_id` and bovine-numbered spectral tuning sites from Hagen et al. 2023. Edit `preprocessing.reference_residue_sites` to change which residues become GNN nodes.
+The training config's `data.indexes_to_keep` is feature-column selection, not residue-site selection; leave it at `0..35` unless you intentionally want to drop generated node features.
 
 The training entry point performs configuration loading, input validation, dataset normalization, weighted sampling, model construction, training/evaluation, checkpointing, metrics logging, and metadata writing.
+
+To train a functional/non-functional classifier from the same preprocessed graphs, use:
+
+```bash
+python -m opsigen train-functional --config configs/train_functional.wds.json
+```
+
+The functional classifier treats `lmax <= classifier.functional_threshold_nm` as non-functional by default and optimizes class-weighted binary cross-entropy with optional minority oversampling.
 
 Training outputs are written under `outputs.output_dir`, for example:
 

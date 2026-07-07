@@ -238,6 +238,66 @@ class TrainingConfig:
 
 
 @dataclass(frozen=True)
+class FunctionalClassifierSettings:
+    """Binary functional/non-functional label and monitoring settings."""
+
+    positive_class: str = "nonfunctional"
+    functional_threshold_nm: float = 0.0
+    decision_threshold: float = 0.5
+    class_weighted_loss: bool = True
+    monitor_metric: str = "balanced_accuracy"
+    monitor_mode: str = "max"
+
+    @classmethod
+    def from_mapping(cls, mapping: Mapping[str, Any]) -> "FunctionalClassifierSettings":
+        classifier = _mapping_at(mapping, "classifier")
+        source = classifier or mapping
+        positive_class = str(source.get("positive_class", "nonfunctional")).lower()
+        if positive_class not in {"functional", "nonfunctional"}:
+            raise ConfigError("classifier.positive_class must be 'functional' or 'nonfunctional'.")
+        monitor_mode = str(source.get("monitor_mode", "max")).lower()
+        if monitor_mode not in {"min", "max"}:
+            raise ConfigError("classifier.monitor_mode must be 'min' or 'max'.")
+        return cls(
+            positive_class=positive_class,
+            functional_threshold_nm=float(source.get("functional_threshold_nm", 0.0)),
+            decision_threshold=float(source.get("decision_threshold", 0.5)),
+            class_weighted_loss=bool(source.get("class_weighted_loss", True)),
+            monitor_metric=str(source.get("monitor_metric", "balanced_accuracy")),
+            monitor_mode=monitor_mode,
+        )
+
+
+@dataclass(frozen=True)
+class FunctionalTrainingConfig:
+    """Full binary functional/non-functional classifier configuration."""
+
+    data: GraphDataConfig
+    model: ModelConfig
+    fit: FitConfig
+    classifier: FunctionalClassifierSettings
+    output_dir: Path
+    run_name: str = "opsigen-functional-classifier"
+
+    @classmethod
+    def from_file(cls, path: str | Path) -> "FunctionalTrainingConfig":
+        mapping, base_dir = load_config_mapping(path)
+        outputs = _mapping_at(mapping, "outputs")
+        return cls(
+            data=GraphDataConfig.from_mapping(mapping, base_dir),
+            model=ModelConfig.from_mapping(mapping, base_dir),
+            fit=FitConfig.from_mapping(mapping),
+            classifier=FunctionalClassifierSettings.from_mapping(mapping),
+            output_dir=require_path(
+                outputs.get("output_dir", mapping.get("output_dir", "runs/train_functional")),
+                base_dir,
+                "outputs.output_dir",
+            ),
+            run_name=str(outputs.get("run_name", mapping.get("run_name", "opsigen-functional-classifier"))),
+        )
+
+
+@dataclass(frozen=True)
 class OpsinRecord:
     """One opsin to preprocess and/or predict."""
 

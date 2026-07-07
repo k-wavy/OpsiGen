@@ -56,6 +56,7 @@ class PreparedWDSDataset:
     test_split: Path
     preprocess_config: Path
     train_config: Path
+    functional_train_config: Path
     predict_config: Path
     validation_report: Path
 
@@ -272,6 +273,7 @@ def prepare_wds_dataset(
 
     preprocess_config = configs_dir / "preprocess.wds.json"
     train_config = configs_dir / "train.wds.json"
+    functional_train_config = configs_dir / "train_functional.wds.json"
     predict_config = configs_dir / "predict.wds.example.json"
 
     preprocess_config.write_text(
@@ -351,6 +353,63 @@ def prepare_wds_dataset(
         + "\n"
     )
 
+    functional_train_config.write_text(
+        json.dumps(
+            {
+                "run_name": "opsigen-wds-functional-classifier",
+                "data": {
+                    "excel_path": _relative_from_file(training_excel, functional_train_config),
+                    "graph_features_path": "../runs/preprocess/wds/features",
+                    "graph_dists_path": "../runs/preprocess/wds/dists",
+                    "features_column": "features_path",
+                    "dists_column": "dists_path",
+                    "id_column": "Name",
+                    "target_column": "lmax",
+                    "wildtype_column": "Wildtype",
+                    "train_wildtypes_list": _relative_from_file(train_split, functional_train_config),
+                    "test_wildtypes_list": _relative_from_file(test_split, functional_train_config),
+                    "indexes_to_keep": list(range(36)),
+                    "dataset_normalize_last": True,
+                    "drop_last_row": False,
+                },
+                "model": {
+                    "name": "GAT21Model",
+                    "number_features": 34,
+                    "hidden_layer_size": 40,
+                    "out_layer_size": 30,
+                    "graph_threshold": 2,
+                    "dropout": 0.1,
+                },
+                "classifier": {
+                    "positive_class": "nonfunctional",
+                    "functional_threshold_nm": 0.0,
+                    "decision_threshold": 0.5,
+                    "class_weighted_loss": True,
+                    "monitor_metric": "balanced_accuracy",
+                    "monitor_mode": "max",
+                },
+                "training": {
+                    "epochs": 100,
+                    "learning_rate": 0.0001,
+                    "weight_decay": 0.00001,
+                    "l1_lambda": 0.0001,
+                    "batch_size": 1,
+                    "weighted_sampler": True,
+                    "sampler_samples": int(len(dataset)),
+                    "seed": seed,
+                    "device": "auto",
+                    "use_wandb": False,
+                    "checkpoint_name": "opsigen_wds_functional_classifier.pkl",
+                },
+                "outputs": {
+                    "output_dir": "../runs/train/wds_functional",
+                },
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
     predict_config.write_text(
         json.dumps(
             {
@@ -403,6 +462,7 @@ def prepare_wds_dataset(
         test_split=test_split,
         preprocess_config=preprocess_config,
         train_config=train_config,
+        functional_train_config=functional_train_config,
         predict_config=predict_config,
         validation_report=validation_report,
     )
